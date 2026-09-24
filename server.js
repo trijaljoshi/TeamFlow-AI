@@ -7,6 +7,7 @@ const projectRoutes = require("./Routes/projectroute");
 const taskRoutes = require("./Routes/taskroute");
 const allTasksRoutes = require("./Routes/alltasksroute");
 const qaTestRoutes = require("./Routes/qatestroute");
+const ticketRoutes = require("./Routes/ticketroute");
 const app = express();
 
 app.use(cors());
@@ -16,6 +17,7 @@ app.use("/api/projects", projectRoutes);
 app.use("/api/projects", taskRoutes);
 app.use("/api/all-tasks", allTasksRoutes);
 app.use("/api", qaTestRoutes);
+app.use("/api", ticketRoutes);
 
 app.get("/", (req, res) => {
   res.json({ message: "TeamFlow backend is running!" });
