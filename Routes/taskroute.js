@@ -1,5 +1,4 @@
 const express = require("express");
-
 const router = express.Router();
 
 const {
@@ -7,58 +6,15 @@ const {
     createGlobalTask,
     getTasks,
     claimTask,
+    completeTask,
 } = require("../controller/taskcontroller");
 
 const authMiddleware = require("../middleware/authmiddleware");
 
-
-// ======================================================
-// CREATE GLOBAL TASK
-// Project can be null
-//
-// POST /api/projects/tasks
-// ======================================================
-router.post(
-    "/tasks",
-    authMiddleware,
-    createGlobalTask
-);
-
-
-// ======================================================
-// CREATE TASK INSIDE A PROJECT
-//
-// POST /api/projects/:projectId/tasks
-// ======================================================
-router.post(
-    "/:projectId/tasks",
-    authMiddleware,
-    createTask
-);
-
-
-// ======================================================
-// GET ALL TASKS OF ONE PROJECT
-//
-// GET /api/projects/:projectId/tasks
-// ======================================================
-router.get(
-    "/:projectId/tasks",
-    authMiddleware,
-    getTasks
-);
-
-
-// ======================================================
-// CLAIM TASK
-//
-// POST /api/projects/:taskId/claim
-// ======================================================
-router.post(
-    "/:taskId/claim",
-    authMiddleware,
-    claimTask
-);
-
+router.post("/tasks", authMiddleware, createGlobalTask);
+router.post("/:projectId/tasks", authMiddleware, createTask);
+router.get("/:projectId/tasks", authMiddleware, getTasks);
+router.post("/:taskId/claim", authMiddleware, claimTask);
+router.patch("/tasks/:taskId/complete", authMiddleware, completeTask);
 
 module.exports = router;

@@ -1,33 +1,17 @@
 const pool = require("../db/db");
 
-// ======================================================
-// CREATE TASK INSIDE A PROJECT
-// POST /api/projects/:projectId/tasks
-// ======================================================
 const createTask = async (req, res) => {
     try {
-        const { title, description, status, priority, due_date, assigned_to } =
-            req.body;
-
+        const { title, description, status, priority, due_date, assigned_to } = req.body;
         const projectId = req.params.projectId;
 
         if (!title) {
-            return res.status(400).json({
-                message: "Task title is required",
-            });
+            return res.status(400).json({ message: "Task title is required" });
         }
 
         const result = await pool.query(
             `INSERT INTO tasks
-            (
-                project_id,
-                title,
-                description,
-                status,
-                priority,
-                due_date,
-                assigned_to
-            )
+            (project_id, title, description, status, priority, due_date, assigned_to)
             VALUES ($1, $2, $3, $4, $5, $6, $7)
             RETURNING *`,
             [
@@ -37,61 +21,31 @@ const createTask = async (req, res) => {
                 status || "TODO",
                 priority || "MEDIUM",
                 due_date || null,
-                assigned_to || null,
+                assigned_to || null
             ]
         );
 
         res.status(201).json({
             message: "Task created successfully",
-            task: result.rows[0],
+            task: result.rows[0]
         });
     } catch (error) {
         console.error("Create task error:", error);
-
-        res.status(500).json({
-            message: "Failed to create task",
-        });
+        res.status(500).json({ message: "Failed to create task" });
     }
 };
 
-
-// ======================================================
-// CREATE GLOBAL / STANDALONE TASK
-// POST /api/projects/tasks
-//
-// project_id can be:
-// null       -> standalone task
-// 1,2,3...   -> task belonging to a project
-// ======================================================
 const createGlobalTask = async (req, res) => {
     try {
-        const {
-            title,
-            description,
-            status,
-            priority,
-            due_date,
-            assigned_to,
-            project_id,
-        } = req.body;
+        const { title, description, status, priority, due_date, assigned_to, project_id } = req.body;
 
         if (!title) {
-            return res.status(400).json({
-                message: "Task title is required",
-            });
+            return res.status(400).json({ message: "Task title is required" });
         }
 
         const result = await pool.query(
             `INSERT INTO tasks
-            (
-                project_id,
-                title,
-                description,
-                status,
-                priority,
-                due_date,
-                assigned_to
-            )
+            (project_id, title, description, status, priority, due_date, assigned_to)
             VALUES ($1, $2, $3, $4, $5, $6, $7)
             RETURNING *`,
             [
@@ -101,28 +55,20 @@ const createGlobalTask = async (req, res) => {
                 status || "TODO",
                 priority || "MEDIUM",
                 due_date || null,
-                assigned_to || null,
+                assigned_to || null
             ]
         );
 
         res.status(201).json({
             message: "Task created successfully",
-            task: result.rows[0],
+            task: result.rows[0]
         });
     } catch (error) {
         console.error("Create global task error:", error);
-
-        res.status(500).json({
-            message: "Failed to create task",
-        });
+        res.status(500).json({ message: "Failed to create task" });
     }
 };
 
-
-// ======================================================
-// GET TASKS OF A PROJECT
-// GET /api/projects/:projectId/tasks
-// ======================================================
 const getTasks = async (req, res) => {
     try {
         const projectId = req.params.projectId;
@@ -133,32 +79,20 @@ const getTasks = async (req, res) => {
                 users.name AS claimed_by_name,
                 assigned_user.name AS assigned_to_name
              FROM tasks
-             LEFT JOIN users
-                ON tasks.claimed_by = users.id
-             LEFT JOIN users AS assigned_user
-                ON tasks.assigned_to = assigned_user.id
+             LEFT JOIN users ON tasks.claimed_by = users.id
+             LEFT JOIN users AS assigned_user ON tasks.assigned_to = assigned_user.id
              WHERE tasks.project_id = $1
              ORDER BY tasks.created_at DESC`,
             [projectId]
         );
 
-        res.status(200).json({
-            tasks: result.rows,
-        });
+        res.status(200).json({ tasks: result.rows });
     } catch (error) {
         console.error("Get tasks error:", error);
-
-        res.status(500).json({
-            message: "Failed to fetch tasks",
-        });
+        res.status(500).json({ message: "Failed to fetch tasks" });
     }
 };
 
-
-// ======================================================
-// CLAIM TASK
-// POST /api/projects/:taskId/claim
-// ======================================================
 const claimTask = async (req, res) => {
     try {
         const taskId = req.params.taskId;
@@ -175,27 +109,78 @@ const claimTask = async (req, res) => {
 
         if (result.rows.length === 0) {
             return res.status(400).json({
-                message: "Task is already claimed or does not exist",
+                message: "Task is already claimed or does not exist"
             });
         }
 
         res.status(200).json({
             message: "Task claimed successfully",
-            task: result.rows[0],
+            task: result.rows[0]
         });
     } catch (error) {
         console.error("Claim task error:", error);
-
-        res.status(500).json({
-            message: "Failed to claim task",
-        });
+        res.status(500).json({ message: "Failed to claim task" });
     }
 };
 
+const completeTask = async (req, res) => {
+    try {
+        const taskId = req.params.taskId;
+        const userId = req.user.userId;
+
+        const taskResult = await pool.query(
+            `SELECT id, claimed_by, status
+             FROM tasks
+             WHERE id = $1`,
+            [taskId]
+        );
+
+        if (taskResult.rows.length === 0) {
+            return res.status(404).json({ message: "Task not found" });
+        }
+
+        const task = taskResult.rows[0];
+
+        if (!task.claimed_by) {
+            return res.status(400).json({
+                message: "Task must be claimed before it can be completed"
+            });
+        }
+
+        if (String(task.claimed_by) !== String(userId)) {
+            return res.status(403).json({
+                message: "Only the user who claimed this task can complete it"
+            });
+        }
+
+        if (String(task.status || "").toUpperCase() === "COMPLETED") {
+            return res.status(400).json({ message: "Task is already completed" });
+        }
+
+        const result = await pool.query(
+            `UPDATE tasks
+             SET status = 'COMPLETED'
+             WHERE id = $1
+             RETURNING *`,
+            [taskId]
+        );
+
+        return res.status(200).json({
+            message: "Task completed successfully",
+            task: result.rows[0]
+        });
+    } catch (error) {
+        console.error("Complete task error:", error);
+        return res.status(500).json({
+            message: "Failed to complete task"
+        });
+    }
+};
 
 module.exports = {
     createTask,
     createGlobalTask,
     getTasks,
     claimTask,
+    completeTask
 };
