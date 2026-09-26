@@ -3,7 +3,10 @@ const pool = require("../db/db");
 const normalizeStatus = (status) =>
     String(status || "PENDING").trim().toUpperCase();
 
+
+// ======================================================
 // CREATE QA TEST
+// ======================================================
 const createQATest = async (req, res) => {
     try {
         const projectId = Number(req.params.projectId);
@@ -18,7 +21,8 @@ const createQATest = async (req, res) => {
         const taskResult = await pool.query(
             `SELECT id, project_id
              FROM tasks
-             WHERE id = $1 AND project_id = $2`,
+             WHERE id = $1
+             AND project_id = $2`,
             [task_id, projectId]
         );
 
@@ -79,7 +83,9 @@ const createQATest = async (req, res) => {
 };
 
 
+// ======================================================
 // GET PROJECT QA TESTS
+// ======================================================
 const getQATests = async (req, res) => {
     try {
         const projectId = Number(req.params.projectId);
@@ -117,7 +123,9 @@ const getQATests = async (req, res) => {
 };
 
 
+// ======================================================
 // CREATE QA TEST FOR TASK
+// ======================================================
 const createQATestForTask = async (req, res) => {
     try {
         const taskId = Number(req.params.taskId);
@@ -195,7 +203,9 @@ const createQATestForTask = async (req, res) => {
 };
 
 
+// ======================================================
 // GET QA TESTS FOR TASK
+// ======================================================
 const getQATestsForTask = async (req, res) => {
     try {
         const taskId = Number(req.params.taskId);
@@ -233,11 +243,14 @@ const getQATestsForTask = async (req, res) => {
 };
 
 
+// ======================================================
 // UPDATE QA TEST - PASS / FAIL
+// ======================================================
 const updateQATest = async (req, res) => {
     try {
         const testId = Number(req.params.testId);
         const status = normalizeStatus(req.body.status);
+        const qaUserId = req.user.userId;
 
         if (
             !testId ||
@@ -249,7 +262,10 @@ const updateQATest = async (req, res) => {
         }
 
         const testResult = await pool.query(
-            `SELECT id, project_id, task_id
+            `SELECT
+                id,
+                project_id,
+                task_id
              FROM qa_tests
              WHERE id = $1`,
             [testId]
@@ -271,6 +287,59 @@ const updateQATest = async (req, res) => {
             [status, testId]
         );
 
+        // ==================================================
+        // SAVE QA HISTORY
+        // Only PASSED / FAILED are actual QA attempts.
+        // PENDING is not stored as a performance result.
+        // ==================================================
+        if (
+            test.task_id &&
+            ["PASSED", "FAILED"].includes(status)
+        ) {
+            const taskResult = await pool.query(
+                `SELECT
+                    id,
+                    claimed_by,
+                    assigned_to
+                 FROM tasks
+                 WHERE id = $1`,
+                [test.task_id]
+            );
+
+            if (taskResult.rows.length > 0) {
+                const task = taskResult.rows[0];
+
+                // The person whose task was tested is the
+                // performance user. Prefer claimed_by,
+                // otherwise fall back to assigned_to.
+                const performerId =
+                    task.claimed_by || task.assigned_to || null;
+
+                if (performerId) {
+                    await pool.query(
+                        `INSERT INTO qa_history
+                        (
+                            task_id,
+                            qa_test_id,
+                            user_id,
+                            result,
+                            tested_at
+                        )
+                        VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)`,
+                        [
+                            test.task_id,
+                            testId,
+                            performerId,
+                            status
+                        ]
+                    );
+                }
+            }
+        }
+
+        // ==================================================
+        // CALCULATE OVERALL TASK QA STATUS
+        // ==================================================
         let taskQaStatus = "PENDING";
 
         if (test.task_id) {
@@ -288,7 +357,11 @@ const updateQATest = async (req, res) => {
                 [test.task_id]
             );
 
-            const { total, passed, failed } = summary.rows[0];
+            const {
+                total,
+                passed,
+                failed
+            } = summary.rows[0];
 
             if (failed > 0) {
                 taskQaStatus = "FAILED";
@@ -322,7 +395,9 @@ const updateQATest = async (req, res) => {
 };
 
 
+// ======================================================
 // DELETE QA TEST
+// ======================================================
 const deleteQATest = async (req, res) => {
     try {
         const testId = Number(req.params.testId);
@@ -357,7 +432,11 @@ const deleteQATest = async (req, res) => {
                 [taskId]
             );
 
-            const { total, passed, failed } = summary.rows[0];
+            const {
+                total,
+                passed,
+                failed
+            } = summary.rows[0];
 
             const qaStatus =
                 failed > 0

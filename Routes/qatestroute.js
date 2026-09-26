@@ -1,4 +1,3 @@
-```javascript
 const express = require("express");
 
 const router = express.Router();
@@ -12,9 +11,13 @@ const {
     getQATestsForTask,
     updateQATest,
     deleteQATest
-} = require("../controller/qacontroller");
+} = require("../controller/qatestcontroller");
 
-// Project QA
+
+// ======================================================
+// PROJECT QA TESTS
+// ======================================================
+
 router.post(
     "/projects/:projectId/qa-tests",
     authMiddleware,
@@ -27,7 +30,11 @@ router.get(
     getQATests
 );
 
-// Task QA
+
+// ======================================================
+// TASK QA TESTS
+// ======================================================
+
 router.post(
     "/tasks/:taskId/qa-tests",
     authMiddleware,
@@ -40,7 +47,11 @@ router.get(
     getQATestsForTask
 );
 
-// Individual QA test
+
+// ======================================================
+// INDIVIDUAL QA TEST
+// ======================================================
+
 router.patch(
     "/qa-tests/:testId",
     authMiddleware,
@@ -53,5 +64,5 @@ router.delete(
     deleteQATest
 );
 
+
 module.exports = router;
-```
