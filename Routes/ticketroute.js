@@ -10,65 +10,119 @@ const {
     claimTicket,
     updateTicketStatus,
     updateTicket,
+    completeTicket,
     retestTicket
 } = require("../controller/ticketcontroller");
 
 const authMiddleware = require("../middleware/authmiddleware");
 
-// Create ticket
+
+// =====================================================
+// CREATE TICKET
+// POST /api/projects/:projectId/tickets
+// =====================================================
+
 router.post(
     "/projects/:projectId/tickets",
     authMiddleware,
     createTicket
 );
 
-// Get all tickets
+
+// =====================================================
+// GET ALL TICKETS
+// GET /api/tickets
+// =====================================================
+
 router.get(
     "/tickets",
     authMiddleware,
     getAllTickets
 );
 
-// Get tickets for a project
+
+// =====================================================
+// GET PROJECT TICKETS
+// GET /api/projects/:projectId/tickets
+// =====================================================
+
 router.get(
     "/projects/:projectId/tickets",
     authMiddleware,
     getProjectTickets
 );
 
-// Get single ticket
+
+// =====================================================
+// GET SINGLE TICKET
+// GET /api/tickets/:ticketId
+// =====================================================
+
 router.get(
     "/tickets/:ticketId",
     authMiddleware,
     getTicket
 );
 
-// Claim ticket
+
+// =====================================================
+// CLAIM TICKET
+// POST /api/tickets/:ticketId/claim
+// =====================================================
+
 router.post(
     "/tickets/:ticketId/claim",
     authMiddleware,
     claimTicket
 );
 
-// Update ticket status
+
+// =====================================================
+// COMPLETE TICKET
+// PATCH /api/tickets/:ticketId/complete
+// =====================================================
+
+router.patch(
+    "/tickets/:ticketId/complete",
+    authMiddleware,
+    completeTicket
+);
+
+
+// =====================================================
+// UPDATE TICKET STATUS
+// PATCH /api/tickets/:ticketId/status
+// =====================================================
+
 router.patch(
     "/tickets/:ticketId/status",
     authMiddleware,
     updateTicketStatus
 );
 
-// Update ticket details
+
+// =====================================================
+// UPDATE TICKET DETAILS
+// PATCH /api/tickets/:ticketId
+// =====================================================
+
 router.patch(
     "/tickets/:ticketId",
     authMiddleware,
     updateTicket
 );
 
-// Retest ticket
+
+// =====================================================
+// RETEST TICKET
+// POST /api/tickets/:ticketId/retest
+// =====================================================
+
 router.post(
     "/tickets/:ticketId/retest",
     authMiddleware,
     retestTicket
 );
+
 
 module.exports = router;
