@@ -10,6 +10,7 @@ const taskRoutes = require("./Routes/taskroute");
 const allTasksRoutes = require("./Routes/alltasksroute");
 const qaTestRoutes = require("./Routes/qatestroute");
 const ticketRoutes = require("./Routes/ticketroute");
+const skillRoutes = require("./Routes/skillroute");
 
 const app = express();
 
@@ -22,6 +23,7 @@ app.use("/api/projects", taskRoutes);
 app.use("/api/all-tasks", allTasksRoutes);
 app.use("/api", qaTestRoutes);
 app.use("/api", ticketRoutes);
+app.use("/api", skillRoutes);
 
 app.get("/", (req, res) => {
     res.json({ message: "TeamFlow backend is running!" });
