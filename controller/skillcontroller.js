@@ -7,16 +7,24 @@ const pool = require("../db/db");
 const addSkill = async (req, res) => {
     try {
         const userId = req.user.userId;
-        const { skill_name, proficiency } = req.body;
 
-        if (!skill_name || !skill_name.trim()) {
+        // Accept both `name` and `skill_name`
+        const { name, skill_name, proficiency } = req.body;
+
+        const rawSkillName = name ?? skill_name;
+
+        if (
+            typeof rawSkillName !== "string" ||
+            !rawSkillName.trim()
+        ) {
             return res.status(400).json({
                 message: "Skill name is required"
             });
         }
 
-        const skillName = skill_name.trim();
+        const skillName = rawSkillName.trim();
 
+        // Check duplicate skill for this user
         const existingSkill = await pool.query(
             `SELECT id
              FROM user_skills
@@ -31,12 +39,17 @@ const addSkill = async (req, res) => {
             });
         }
 
+        // Insert skill
         const result = await pool.query(
             `INSERT INTO user_skills
                 (user_id, skill_name, proficiency)
              VALUES ($1, $2, $3)
              RETURNING *`,
-            [userId, skillName, proficiency || null]
+            [
+                userId,
+                skillName,
+                proficiency || null
+            ]
         );
 
         return res.status(201).json({
@@ -98,23 +111,38 @@ const updateSkill = async (req, res) => {
         const userId = req.user.userId;
         const skillId = req.params.skillId;
 
-        const { skill_name, proficiency } = req.body;
+        // Accept both `name` and `skill_name`
+        const {
+            name,
+            skill_name,
+            proficiency
+        } = req.body;
 
-        if (!skill_name || !skill_name.trim()) {
+        const rawSkillName = name ?? skill_name;
+
+        if (
+            typeof rawSkillName !== "string" ||
+            !rawSkillName.trim()
+        ) {
             return res.status(400).json({
                 message: "Skill name is required"
             });
         }
 
-        const skillName = skill_name.trim();
+        const skillName = rawSkillName.trim();
 
+        // Check duplicate skill
         const existingSkill = await pool.query(
             `SELECT id
              FROM user_skills
              WHERE user_id = $1
              AND LOWER(skill_name) = LOWER($2)
              AND id != $3`,
-            [userId, skillName, skillId]
+            [
+                userId,
+                skillName,
+                skillId
+            ]
         );
 
         if (existingSkill.rows.length > 0) {
@@ -123,6 +151,7 @@ const updateSkill = async (req, res) => {
             });
         }
 
+        // Update skill
         const result = await pool.query(
             `UPDATE user_skills
              SET skill_name = $1,
@@ -174,7 +203,10 @@ const deleteSkill = async (req, res) => {
              WHERE id = $1
              AND user_id = $2
              RETURNING *`,
-            [skillId, userId]
+            [
+                skillId,
+                userId
+            ]
         );
 
         if (result.rows.length === 0) {
@@ -198,6 +230,9 @@ const deleteSkill = async (req, res) => {
 };
 
 
+// ======================================================
+// EXPORTS
+// ======================================================
 module.exports = {
     addSkill,
     getMySkills,
