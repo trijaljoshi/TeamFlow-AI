@@ -9,6 +9,7 @@ const projectRoutes = require("./Routes/projectroute");
 const taskRoutes = require("./Routes/taskroute");
 const allTasksRoutes = require("./Routes/alltasksroute");
 const qaTestRoutes = require("./Routes/qatestroute");
+const historyRoutes = require("./Routes/historyroute");
 const ticketRoutes = require("./Routes/ticketroute");
 const skillRoutes = require("./Routes/skillroute");
 const performanceRoutes = require("./Routes/performanceroute");
@@ -26,6 +27,7 @@ app.use("/api/all-tasks", allTasksRoutes);
 app.use("/api", qaTestRoutes);
 app.use("/api", ticketRoutes);
 app.use("/api", skillRoutes);
+app.use("/api", historyRoutes);
 app.use("/api", performanceRoutes);
 app.use(
   "/api/recommendations",
