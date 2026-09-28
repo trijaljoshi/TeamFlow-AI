@@ -328,7 +328,7 @@ const getTaskRecommendations = async (req, res) => {
 
         // 6. Send employees to Python ML model
         const pythonProcess = spawn(
-            "python3",
+            "ml/venv/bin/python",
             [
                 "ml/scripts/recommend.py",
                 JSON.stringify(employees)
