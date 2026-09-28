@@ -8,9 +8,12 @@ const {
     deleteSkill
 } = require("../controller/skillcontroller");
 
-router.post("/users/skills", addSkill);
-router.get("/users/skills", getMySkills);
-router.patch("/users/skills/:skillId", updateSkill);
-router.delete("/users/skills/:skillId", deleteSkill);
+const authMiddleware = require("../middleware/authmiddleware");
+
+// Skills
+router.post("/users/skills", authMiddleware, addSkill);
+router.get("/users/skills", authMiddleware, getMySkills);
+router.patch("/users/skills/:skillId", authMiddleware, updateSkill);
+router.delete("/users/skills/:skillId", authMiddleware, deleteSkill);
 
 module.exports = router;
