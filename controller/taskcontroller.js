@@ -24,6 +24,25 @@ const createTask = async (req, res) => {
             });
         }
 
+        // Only the project creator (manager/owner) can create tasks
+        // inside this project. Do not rely on the frontend button alone.
+        const projectResult = await pool.query(
+            `SELECT id, created_by
+             FROM projects
+             WHERE id = $1`,
+            [projectId]
+        );
+
+        if (projectResult.rows.length === 0) {
+            return res.status(404).json({ message: "Project not found" });
+        }
+
+        if (String(projectResult.rows[0].created_by) !== String(req.user.userId)) {
+            return res.status(403).json({
+                message: "Only this project's manager can create tasks"
+            });
+        }
+
         if (depends_on_task_id) {
             const dependency = await pool.query(
                 `SELECT id

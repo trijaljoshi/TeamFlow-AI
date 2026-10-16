@@ -56,7 +56,7 @@ def main():
                 else "Higher risk of delay/failure"
             )
 
-            recommendations.append({
+            item = {
                 "employeeId": employee["employeeId"],
                 "successProbability": probability,
                 "prediction": prediction,
@@ -64,7 +64,15 @@ def main():
                     feature: employee[feature]
                     for feature in feature_columns
                 }
-            })
+            }
+
+            # Employee-side recommendations pass task metadata through the same model.
+            for key in ("taskId", "title", "description", "projectId", "projectName",
+                        "priority", "dueDate", "requiredSkills", "status", "qaStatus"):
+                if key in employee:
+                    item[key] = employee[key]
+
+            recommendations.append(item)
 
         # Highest probability first
         recommendations.sort(

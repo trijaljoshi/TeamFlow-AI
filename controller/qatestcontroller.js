@@ -3,10 +3,7 @@ const pool = require("../db/db");
 const normalizeStatus = (status) =>
     String(status || "PENDING").trim().toUpperCase();
 
-
-// ======================================================
 // CREATE QA TEST
-// ======================================================
 const createQATest = async (req, res) => {
     try {
         const projectId = Number(req.params.projectId);
@@ -21,8 +18,7 @@ const createQATest = async (req, res) => {
         const taskResult = await pool.query(
             `SELECT id, project_id
              FROM tasks
-             WHERE id = $1
-             AND project_id = $2`,
+             WHERE id = $1 AND project_id = $2`,
             [task_id, projectId]
         );
 
@@ -50,8 +46,8 @@ const createQATest = async (req, res) => {
 
         const result = await pool.query(
             `INSERT INTO qa_tests
-             (project_id, task_id, name, description, status)
-             VALUES ($1, $2, $3, $4, 'PENDING')
+             (project_id, task_id, name, description, status, failure_count)
+             VALUES ($1, $2, $3, $4, 'PENDING', 0)
              RETURNING *`,
             [
                 projectId,
@@ -72,20 +68,15 @@ const createQATest = async (req, res) => {
             message: "QA test created successfully",
             testCase: result.rows[0]
         });
-
     } catch (error) {
         console.error("Create QA test error:", error);
-
         return res.status(500).json({
             message: "Failed to create QA test"
         });
     }
 };
 
-
-// ======================================================
 // GET PROJECT QA TESTS
-// ======================================================
 const getQATests = async (req, res) => {
     try {
         const projectId = Number(req.params.projectId);
@@ -102,8 +93,7 @@ const getQATests = async (req, res) => {
                 tasks.title AS task_title,
                 tasks.qa_status AS task_qa_status
              FROM qa_tests
-             LEFT JOIN tasks
-                ON tasks.id = qa_tests.task_id
+             LEFT JOIN tasks ON tasks.id = qa_tests.task_id
              WHERE qa_tests.project_id = $1
              ORDER BY qa_tests.created_at DESC, qa_tests.id DESC`,
             [projectId]
@@ -112,20 +102,15 @@ const getQATests = async (req, res) => {
         return res.status(200).json({
             testCases: result.rows
         });
-
     } catch (error) {
         console.error("Get QA tests error:", error);
-
         return res.status(500).json({
             message: "Failed to fetch QA tests"
         });
     }
 };
 
-
-// ======================================================
 // CREATE QA TEST FOR TASK
-// ======================================================
 const createQATestForTask = async (req, res) => {
     try {
         const taskId = Number(req.params.taskId);
@@ -170,8 +155,8 @@ const createQATestForTask = async (req, res) => {
 
         const result = await pool.query(
             `INSERT INTO qa_tests
-             (project_id, task_id, name, description, status)
-             VALUES ($1, $2, $3, $4, 'PENDING')
+             (project_id, task_id, name, description, status, failure_count)
+             VALUES ($1, $2, $3, $4, 'PENDING', 0)
              RETURNING *`,
             [
                 task.project_id,
@@ -192,20 +177,15 @@ const createQATestForTask = async (req, res) => {
             message: "QA test created successfully",
             testCase: result.rows[0]
         });
-
     } catch (error) {
         console.error("Create task QA test error:", error);
-
         return res.status(500).json({
             message: "Failed to create QA test"
         });
     }
 };
 
-
-// ======================================================
 // GET QA TESTS FOR TASK
-// ======================================================
 const getQATestsForTask = async (req, res) => {
     try {
         const taskId = Number(req.params.taskId);
@@ -222,8 +202,7 @@ const getQATestsForTask = async (req, res) => {
                 tasks.title AS task_title,
                 tasks.qa_status AS task_qa_status
              FROM qa_tests
-             LEFT JOIN tasks
-                ON tasks.id = qa_tests.task_id
+             LEFT JOIN tasks ON tasks.id = qa_tests.task_id
              WHERE qa_tests.task_id = $1
              ORDER BY qa_tests.created_at DESC, qa_tests.id DESC`,
             [taskId]
@@ -232,30 +211,21 @@ const getQATestsForTask = async (req, res) => {
         return res.status(200).json({
             testCases: result.rows
         });
-
     } catch (error) {
         console.error("Get task QA tests error:", error);
-
         return res.status(500).json({
             message: "Failed to fetch task QA tests"
         });
     }
 };
 
-
-// ======================================================
-// UPDATE QA TEST - PASS / FAIL
-// ======================================================
+// UPDATE QA TEST
 const updateQATest = async (req, res) => {
     try {
         const testId = Number(req.params.testId);
         const status = normalizeStatus(req.body.status);
-        const qaUserId = req.user.userId;
 
-        if (
-            !testId ||
-            !["PENDING", "PASSED", "FAILED"].includes(status)
-        ) {
+        if (!testId || !["PENDING", "PASSED", "FAILED"].includes(status)) {
             return res.status(400).json({
                 message: "Valid status is required: PENDING, PASSED or FAILED"
             });
@@ -265,7 +235,9 @@ const updateQATest = async (req, res) => {
             `SELECT
                 id,
                 project_id,
-                task_id
+                task_id,
+                status,
+                COALESCE(failure_count, 0) AS failure_count
              FROM qa_tests
              WHERE id = $1`,
             [testId]
@@ -279,89 +251,49 @@ const updateQATest = async (req, res) => {
 
         const test = testResult.rows[0];
 
+        /*
+         * Increase failure_count only when the QA test
+         * changes into FAILED.
+         *
+         * This prevents accidental duplicate increments
+         * if the same FAILED request is sent again.
+         */
         const updatedResult = await pool.query(
             `UPDATE qa_tests
-             SET status = $1
+             SET
+                 status = $1,
+                 failure_count = CASE
+                     WHEN $1 = 'FAILED'
+                          AND UPPER(COALESCE(status, '')) <> 'FAILED'
+                     THEN COALESCE(failure_count, 0) + 1
+                     ELSE COALESCE(failure_count, 0)
+                 END
              WHERE id = $2
              RETURNING *`,
             [status, testId]
         );
 
-        // ==================================================
-        // SAVE QA HISTORY
-        // Only PASSED / FAILED are actual QA attempts.
-        // PENDING is not stored as a performance result.
-        // ==================================================
-        if (
-            test.task_id &&
-            ["PASSED", "FAILED"].includes(status)
-        ) {
-            const taskResult = await pool.query(
-                `SELECT
-                    id,
-                    claimed_by,
-                    assigned_to
-                 FROM tasks
-                 WHERE id = $1`,
-                [test.task_id]
-            );
-
-            if (taskResult.rows.length > 0) {
-                const task = taskResult.rows[0];
-
-                // The person whose task was tested is the
-                // performance user. Prefer claimed_by,
-                // otherwise fall back to assigned_to.
-                const performerId =
-                    task.claimed_by || task.assigned_to || null;
-
-                if (performerId) {
-                    await pool.query(
-                        `INSERT INTO qa_history
-                        (
-                            task_id,
-                            qa_test_id,
-                            user_id,
-                            result,
-                            tested_at
-                        )
-                        VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)`,
-                        [
-                            test.task_id,
-                            testId,
-                            performerId,
-                            status
-                        ]
-                    );
-                }
-            }
-        }
-
-        // ==================================================
-        // CALCULATE OVERALL TASK QA STATUS
-        // ==================================================
         let taskQaStatus = "PENDING";
 
         if (test.task_id) {
             const summary = await pool.query(
                 `SELECT
                     COUNT(*)::int AS total,
+
                     COUNT(*) FILTER (
                         WHERE UPPER(status) = 'PASSED'
                     )::int AS passed,
+
                     COUNT(*) FILTER (
                         WHERE UPPER(status) = 'FAILED'
                     )::int AS failed
+
                  FROM qa_tests
                  WHERE task_id = $1`,
                 [test.task_id]
             );
 
-            const {
-                total,
-                passed,
-                failed
-            } = summary.rows[0];
+            const { total, passed, failed } = summary.rows[0];
 
             if (failed > 0) {
                 taskQaStatus = "FAILED";
@@ -379,6 +311,7 @@ const updateQATest = async (req, res) => {
 
         return res.status(200).json({
             message: "QA test updated successfully",
+
             testCase: {
                 ...updatedResult.rows[0],
                 task_qa_status: taskQaStatus
@@ -394,10 +327,7 @@ const updateQATest = async (req, res) => {
     }
 };
 
-
-// ======================================================
 // DELETE QA TEST
-// ======================================================
 const deleteQATest = async (req, res) => {
     try {
         const testId = Number(req.params.testId);
@@ -421,22 +351,21 @@ const deleteQATest = async (req, res) => {
             const summary = await pool.query(
                 `SELECT
                     COUNT(*)::int AS total,
+
                     COUNT(*) FILTER (
                         WHERE UPPER(status) = 'PASSED'
                     )::int AS passed,
+
                     COUNT(*) FILTER (
                         WHERE UPPER(status) = 'FAILED'
                     )::int AS failed
+
                  FROM qa_tests
                  WHERE task_id = $1`,
                 [taskId]
             );
 
-            const {
-                total,
-                passed,
-                failed
-            } = summary.rows[0];
+            const { total, passed, failed } = summary.rows[0];
 
             const qaStatus =
                 failed > 0
@@ -465,7 +394,6 @@ const deleteQATest = async (req, res) => {
         });
     }
 };
-
 
 module.exports = {
     createQATest,

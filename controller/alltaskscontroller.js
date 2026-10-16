@@ -12,6 +12,10 @@ const getAllTasks = async (req, res) => {
                 ON tasks.project_id = projects.id
              LEFT JOIN users
                 ON tasks.claimed_by = users.id
+             WHERE tasks.claimed_by IS NULL
+               AND tasks.assigned_to IS NULL
+               AND UPPER(COALESCE(tasks.status, 'TODO')) NOT IN
+                   ('COMPLETED', 'COMPLETE', 'DONE', 'CLOSED')
              ORDER BY tasks.created_at DESC`
         );
 
