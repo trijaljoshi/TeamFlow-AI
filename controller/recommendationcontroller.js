@@ -450,14 +450,7 @@ const getPreviewTaskRecommendations = async (req, res) => {
         );
         const taskText = `${title} ${description}`.toLowerCase();
         const candidates = [];
-        // Only recommend other users from the manager's department when their
-        // department is set. Legacy accounts without a department remain usable.
-        const managerDepartment = String(req.user?.department || '').trim().toLowerCase();
-        const eligibleUsers = usersResult.rows.filter(user => {
-            if (Number(user.id) === userId) return false;
-            if (!managerDepartment) return true;
-            return String(user.department || '').trim().toLowerCase() === managerDepartment;
-        });
+        const eligibleUsers = usersResult.rows.filter(user => Number(user.id) !== userId);
 
         for (const user of eligibleUsers) {
             const [historyResult, qaResult, activeTasksResult, activeTicketsResult, skillsResult] = await Promise.all([
