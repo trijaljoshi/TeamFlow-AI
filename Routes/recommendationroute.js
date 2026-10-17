@@ -6,13 +6,29 @@ const {
   getPreviewTaskRecommendations,
   getMyTaskRecommendations,
 } = require("../controller/recommendationcontroller");
+
 const authMiddleware = require("../middleware/authmiddleware");
 
-// User-side ML recommendations. Frontend calls GET /api/recommendations/my-tasks.
+// Quick diagnostic endpoint: GET /api/recommendations/health
+router.get("/health", (_req, res) => {
+  res.json({
+    success: true,
+    message: "Recommendation routes are loaded",
+    endpoints: [
+      "GET /api/recommendations/my-tasks",
+      "GET /api/recommendations/task/:taskId",
+      "GET /api/recommendations/preview",
+    ],
+  });
+});
+
+// User-side recommendations for the currently authenticated user.
 router.get("/my-tasks", authMiddleware, getMyTaskRecommendations);
-// Manager-side preview before a task is saved.
+
+// Manager-side recommendations for a task that already exists.
+router.get("/task/:taskId", authMiddleware, getTaskRecommendations);
+
+// Preview assignee recommendations before a task is saved.
 router.get("/preview", authMiddleware, getPreviewTaskRecommendations);
-// Manager-side recommendations for an existing task.
-router.get("/task/:taskId", getTaskRecommendations);
 
 module.exports = router;
