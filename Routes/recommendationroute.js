@@ -9,14 +9,14 @@ const {
 
 const authMiddleware = require("../middleware/authmiddleware");
 
-// Personalized task recommendations for the logged-in employee.
+// Employee-side recommendations for the currently logged-in user.
 router.get("/my-tasks", authMiddleware, getMyTaskRecommendations);
 
-// Preview suitable employees before the manager saves a task.
-// Supports title, description, priority, dueDate and optional projectId query params.
+// Preview recommendations before a task is saved.
+// Frontend calls GET /api/recommendations/preview.
 router.get("/preview", authMiddleware, getPreviewTaskRecommendations);
 
-// Rank employees for a task that already exists.
-router.get("/task/:taskId", authMiddleware, getTaskRecommendations);
+// Manager-side recommendations for an existing task.
+router.get("/task/:taskId", getTaskRecommendations);
 
 module.exports = router;
