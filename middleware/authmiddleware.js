@@ -26,7 +26,7 @@ const authMiddleware = async (req, res, next) => {
 
         // Get CURRENT user information from database
         const result = await pool.query(
-            `SELECT id, name, email, role
+            `SELECT id, name, email, role, department
              FROM users
              WHERE id = $1`,
             [decoded.userId]
@@ -45,7 +45,8 @@ const authMiddleware = async (req, res, next) => {
             userId: user.id,
             name: user.name,
             email: user.email,
-            role: user.role
+            role: user.role,
+            department: user.department
         };
 
         next();
