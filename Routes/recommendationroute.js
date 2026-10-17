@@ -2,33 +2,30 @@ const express = require("express");
 const router = express.Router();
 
 const {
-  getTaskRecommendations,
-  getPreviewTaskRecommendations,
-  getMyTaskRecommendations,
+    getTaskRecommendations,
+    getPreviewTaskRecommendations,
+    getMyTaskRecommendations
 } = require("../controller/recommendationcontroller");
 
 const authMiddleware = require("../middleware/authmiddleware");
 
-// Quick diagnostic endpoint: GET /api/recommendations/health
-router.get("/health", (_req, res) => {
-  res.json({
-    success: true,
-    message: "Recommendation routes are loaded",
-    endpoints: [
-      "GET /api/recommendations/my-tasks",
-      "GET /api/recommendations/task/:taskId",
-      "GET /api/recommendations/preview",
-    ],
-  });
+// Lightweight route check. This only confirms that the recommendation router
+// is mounted; it does not test the database or ML model.
+router.get("/health", (req, res) => {
+    res.json({
+        success: true,
+        service: "recommendations",
+        message: "Recommendation routes are mounted"
+    });
 });
 
-// User-side recommendations for the currently authenticated user.
+// Employee-side recommendations for the logged-in user.
 router.get("/my-tasks", authMiddleware, getMyTaskRecommendations);
-
-// Manager-side recommendations for a task that already exists.
-router.get("/task/:taskId", authMiddleware, getTaskRecommendations);
 
 // Preview assignee recommendations before a task is saved.
 router.get("/preview", authMiddleware, getPreviewTaskRecommendations);
+
+// Manager-side recommendations for an existing task.
+router.get("/task/:taskId", authMiddleware, getTaskRecommendations);
 
 module.exports = router;
