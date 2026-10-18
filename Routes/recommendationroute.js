@@ -1,3 +1,4 @@
+
 const express = require("express");
 const router = express.Router();
 
@@ -9,8 +10,7 @@ const {
 
 const authMiddleware = require("../middleware/authmiddleware");
 
-// Lightweight route check. This only confirms that the recommendation router
-// is mounted; it does not test the database or ML model.
+// Health check: confirms that the recommendation router is mounted.
 router.get("/health", (req, res) => {
     res.json({
         success: true,
@@ -20,12 +20,24 @@ router.get("/health", (req, res) => {
 });
 
 // Employee-side recommendations for the logged-in user.
-router.get("/my-tasks", authMiddleware, getMyTaskRecommendations);
+router.get(
+    "/my-tasks",
+    authMiddleware,
+    getMyTaskRecommendations
+);
 
-// Preview assignee recommendations before a task is saved.
-router.get("/preview", authMiddleware, getPreviewTaskRecommendations);
+// Preview assignee recommendations before saving a task.
+router.get(
+    "/preview",
+    authMiddleware,
+    getPreviewTaskRecommendations
+);
 
 // Manager-side recommendations for an existing task.
-router.get("/task/:taskId", authMiddleware, getTaskRecommendations);
+router.get(
+    "/task/:taskId",
+    authMiddleware,
+    getTaskRecommendations
+);
 
 module.exports = router;
