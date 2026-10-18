@@ -13,6 +13,13 @@ const authMiddleware = async (req, res, next) => {
 
         const token = authHeader.split(" ")[1];
 
+        if (!token) {
+            return res.status(401).json({
+                message: "Authentication required"
+            });
+        }
+
+        // Verify the JWT using the configured secret
         const decoded = jwt.verify(
             token,
             process.env.JWT_SECRET
@@ -24,9 +31,10 @@ const authMiddleware = async (req, res, next) => {
             });
         }
 
-        // Get CURRENT user information from database
+        // Fetch the current user from the actual database schema.
+        // The users table does not contain a role column.
         const result = await pool.query(
-            `SELECT id, name, email, role, department
+            `SELECT id, name, email, department
              FROM users
              WHERE id = $1`,
             [decoded.userId]
@@ -40,22 +48,30 @@ const authMiddleware = async (req, res, next) => {
 
         const user = result.rows[0];
 
-        // Store complete authenticated user
         req.user = {
             userId: user.id,
             name: user.name,
             email: user.email,
-            role: user.role,
             department: user.department
         };
 
-        next();
+        return next();
 
     } catch (error) {
-        console.error("Auth middleware error:", error);
+        console.error("Auth middleware error:", error.message);
 
-        return res.status(401).json({
-            message: "Invalid or expired token"
+        if (
+            error.name === "TokenExpiredError" ||
+            error.name === "JsonWebTokenError" ||
+            error.name === "NotBeforeError"
+        ) {
+            return res.status(401).json({
+                message: "Invalid or expired token"
+            });
+        }
+
+        return res.status(500).json({
+            message: "Authentication failed"
         });
     }
 };
