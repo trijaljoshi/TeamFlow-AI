@@ -34,7 +34,8 @@ app.use("/api/notifications", notificationRoutes);
 app.use("/api/analytics", analyticsRoutes);
 app.use("/api", skillRoutes);
 app.use("/api/users", userInsightsRoutes);
-
+app.use("/api/tasks", taskRoutes);
+app.use("/api", taskRoutes);
 app.get("/", (req, res) => {
     res.json({ message: "TeamFlow backend is running!" });
 });
