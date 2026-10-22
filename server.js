@@ -6,6 +6,7 @@ const pool = require("./db/db");
 
 const authRoutes = require("./Routes/authroutes");
 const projectRoutes = require("./Routes/projectroute");
+const skillRoutes = require("./Routes/skillroute");
 const taskRoutes = require("./Routes/taskroute");
 const allTasksRoutes = require("./Routes/alltasksroute");
 const qaTestRoutes = require("./Routes/qatestroute");
@@ -31,6 +32,7 @@ app.use("/api", ticketRoutes);
 app.use("/api/recommendations", recommendationRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/analytics", analyticsRoutes);
+app.use("/api", skillRoutes);
 app.use("/api/users", userInsightsRoutes);
 
 app.get("/", (req, res) => {
