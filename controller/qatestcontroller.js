@@ -263,10 +263,10 @@ const updateQATest = async (req, res) => {
         const updatedResult = await pool.query(
             `UPDATE qa_tests
              SET
-                 status = $1,
+                 status = $1::varchar,
                  failure_count = CASE
-                     WHEN $1 = 'FAILED'
-                          AND UPPER(COALESCE(status, '')) <> 'FAILED'
+                     WHEN $1::varchar = 'FAILED'
+                          AND UPPER(COALESCE(status::text, '')) <> 'FAILED'
                      THEN COALESCE(failure_count, 0) + 1
                      ELSE COALESCE(failure_count, 0)
                  END
@@ -274,7 +274,6 @@ const updateQATest = async (req, res) => {
              RETURNING *`,
             [status, testId]
         );
-
         let taskQaStatus = "PENDING";
 
         if (test.task_id) {
