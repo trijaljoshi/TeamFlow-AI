@@ -1,3 +1,4 @@
+
 const pool = require("../db/db");
 
 const normalizeStatus = (status) =>
@@ -71,7 +72,8 @@ const createQATest = async (req, res) => {
     } catch (error) {
         console.error("Create QA test error:", error);
         return res.status(500).json({
-            message: "Failed to create QA test"
+            message: "Failed to create QA test",
+            error: error.message
         });
     }
 };
