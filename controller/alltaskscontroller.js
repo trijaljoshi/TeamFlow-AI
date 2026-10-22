@@ -1,3 +1,4 @@
+
 const pool = require("../db/db");
 
 const getAllTasks = async (req, res) => {
@@ -6,27 +7,26 @@ const getAllTasks = async (req, res) => {
             `SELECT
                 tasks.*,
                 projects.name AS project_name,
-                users.name AS claimed_by_name
+                claimed_user.name AS claimed_by_name,
+                assigned_user.name AS assigned_to_name
              FROM tasks
              LEFT JOIN projects
                 ON tasks.project_id = projects.id
-             LEFT JOIN users
-                ON tasks.claimed_by = users.id
-             WHERE tasks.claimed_by IS NULL
-               AND tasks.assigned_to IS NULL
-               AND UPPER(COALESCE(tasks.status, 'TODO')) NOT IN
-                   ('COMPLETED', 'COMPLETE', 'DONE', 'CLOSED')
+             LEFT JOIN users AS claimed_user
+                ON tasks.claimed_by = claimed_user.id
+             LEFT JOIN users AS assigned_user
+                ON tasks.assigned_to = assigned_user.id
              ORDER BY tasks.created_at DESC`
         );
 
-        res.status(200).json({
+        return res.status(200).json({
             tasks: result.rows
         });
 
     } catch (error) {
         console.error("Get all tasks error:", error);
 
-        res.status(500).json({
+        return res.status(500).json({
             message: "Failed to fetch all tasks"
         });
     }
