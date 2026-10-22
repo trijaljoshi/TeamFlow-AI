@@ -1,9 +1,9 @@
+
 const pool = require("../db/db");
 
 /*
  * TeamFlow Analytics
  *
- * IMPORTANT:
  * Analytics are calculated from PostgreSQL work history:
  * tasks, QA results and tickets. We do NOT track frontend searches.
  */
@@ -260,7 +260,9 @@ const getUserHistory = async (req, res) => {
         const userId = Number(req.params.userId);
 
         if (!userId) {
-            return res.status(400).json({ message: "Valid userId is required" });
+            return res.status(400).json({
+                message: "Valid userId is required",
+            });
         }
 
         const result = await pool.query(
@@ -280,7 +282,9 @@ const getUserHistory = async (req, res) => {
             FROM tasks t
             LEFT JOIN projects p ON p.id = t.project_id
             LEFT JOIN LATERAL (
-                SELECT SUM(COALESCE(q.failure_count, 0)) AS failure_count
+                SELECT COUNT(*) FILTER (
+                    WHERE UPPER(COALESCE(q.status, '')) = 'FAILED'
+                )::int AS failure_count
                 FROM qa_tests q
                 WHERE q.task_id = t.id
             ) qa ON TRUE
@@ -291,7 +295,9 @@ const getUserHistory = async (req, res) => {
             [userId]
         );
 
-        return res.json({ history: result.rows });
+        return res.json({
+            history: result.rows,
+        });
     } catch (error) {
         console.error("User history error:", error);
         return res.status(500).json({
@@ -305,7 +311,9 @@ const getUserPerformance = async (req, res) => {
         const userId = Number(req.params.userId);
 
         if (!userId) {
-            return res.status(400).json({ message: "Valid userId is required" });
+            return res.status(400).json({
+                message: "Valid userId is required",
+            });
         }
 
         const result = await pool.query(
@@ -334,7 +342,9 @@ const getUserPerformance = async (req, res) => {
                     COUNT(q.id) FILTER (
                         WHERE UPPER(COALESCE(q.status, '')) = 'FAILED'
                     )::int AS qa_failed,
-                    COALESCE(SUM(q.failure_count), 0)::int AS qa_failure_count
+                    COUNT(q.id) FILTER (
+                        WHERE UPPER(COALESCE(q.status, '')) = 'FAILED'
+                    )::int AS qa_failure_count
                 FROM qa_tests q
                 JOIN tasks t ON t.id = q.task_id
                 WHERE t.assigned_to = $1 OR t.claimed_by = $1
