@@ -1,25 +1,90 @@
-const { sendEmail } = require("./emailService");
 
-const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (ch) => ({
-  "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
-}[ch]));
+const BREVO_API_URL = "https://api.brevo.com/v3/smtp/email";
 
-async function sendEventEmail({ to, name, subject, intro, details = [] }) {
-  if (!to) return;
-  const rows = details.map(([label, value]) =>
-    `<p><strong>${escapeHtml(label)}:</strong> ${escapeHtml(value || "—")}</p>`
-  ).join("");
-  try {
-    await sendEmail({
-      to,
-      name: name || "",
-      subject,
-      htmlContent: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;padding:24px;color:#0f172a"><h2 style="color:#0d9488">TeamFlow AI</h2><p>Hi ${escapeHtml(name || "there")},</p><p>${escapeHtml(intro)}</p>${rows}<p>Regards,<br><strong>TeamFlow AI</strong></p></div>`
-    });
-  } catch (error) {
-    // Email is best-effort; never fail the underlying task/QA/ticket action.
-    console.error("Event email failed:", subject, error?.message || error);
+async function sendEmail({
+  to,
+  name = "",
+  subject,
+  htmlContent,
+  textContent,
+}) {
+  const apiKey = process.env.BREVO_API_KEY;
+  const senderEmail = process.env.BREVO_SENDER_EMAIL;
+  const senderName = process.env.BREVO_SENDER_NAME || "TeamFlow AI";
+
+  if (!apiKey) {
+    throw new Error("BREVO_API_KEY is missing from environment variables");
   }
+
+  if (!senderEmail) {
+    throw new Error("BREVO_SENDER_EMAIL is missing from environment variables");
+  }
+
+  if (!to || !subject || (!htmlContent && !textContent)) {
+    throw new Error("Email recipient, subject, and content are required");
+  }
+
+  const recipients = (Array.isArray(to) ? to : [to]).map((recipient) => {
+    if (typeof recipient === "string") {
+      return { email: recipient };
+    }
+
+    return {
+      email: recipient.email,
+      ...(recipient.name ? { name: recipient.name } : {}),
+    };
+  });
+
+  const payload = {
+    sender: {
+      name: senderName,
+      email: senderEmail,
+    },
+    to: recipients,
+    subject,
+    ...(htmlContent ? { htmlContent } : {}),
+    ...(textContent ? { textContent } : {}),
+  };
+
+  // Add a recipient name when one is supplied.
+  if (name && recipients.length === 1) {
+    payload.to[0].name = name;
+  }
+
+  const response = await fetch(BREVO_API_URL, {
+    method: "POST",
+    headers: {
+      "accept": "application/json",
+      "api-key": apiKey,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const responseText = await response.text();
+
+  if (!response.ok) {
+    throw new Error(
+      `Brevo email failed (${response.status}): ${responseText}`
+    );
+  }
+
+  let result = {};
+  if (responseText) {
+    try {
+      result = JSON.parse(responseText);
+    } catch {
+      result = { message: responseText };
+    }
+  }
+
+  console.log("Email accepted by Brevo:", {
+    to: recipients.map((recipient) => recipient.email),
+    subject,
+    messageId: result.messageId || null,
+  });
+
+  return result;
 }
 
-module.exports = { sendEventEmail };
+module.exports = { sendEmail };
