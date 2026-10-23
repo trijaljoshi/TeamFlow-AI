@@ -1,4 +1,5 @@
 const pool = require("../db/db");
+const { sendEventEmail } = require("../utils/eventEmail");
 
 const createTask = async (req, res) => {
     try {
@@ -135,6 +136,32 @@ const claimTask = async (req, res) => {
             return res.status(400).json({
                 message: "Task is already claimed or does not exist"
             });
+        }
+
+        // Notify project manager that the task was claimed.
+        try {
+            const info = await pool.query(
+                `SELECT t.title, p.name AS project_name,
+                        manager.email AS manager_email, manager.name AS manager_name,
+                        claimant.name AS claimant_name
+                 FROM tasks t
+                 JOIN projects p ON p.id = t.project_id
+                 LEFT JOIN users manager ON manager.id = p.created_by
+                 LEFT JOIN users claimant ON claimant.id = $2
+                 WHERE t.id = $1`,
+                [taskId, userId]
+            );
+            const row = info.rows[0];
+            if (row?.manager_email) {
+                await sendEventEmail({
+                    to: row.manager_email, name: row.manager_name,
+                    subject: `Task claimed: ${row.title}`,
+                    intro: `${row.claimant_name || "A team member"} claimed a task.`,
+                    details: [["Project", row.project_name], ["Task", row.title], ["Claimed by", row.claimant_name]]
+                });
+            }
+        } catch (emailLookupError) {
+            console.error("Task claim notification lookup failed:", emailLookupError.message);
         }
 
         res.status(200).json({

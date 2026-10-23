@@ -1,4 +1,5 @@
 const pool = require("../db/db");
+const { sendEventEmail } = require("../utils/eventEmail");
 
 
 // =====================================================
@@ -87,6 +88,31 @@ const createTicket = async (req, res) => {
                 due_date || null
             ]
         );
+
+        // Notify project manager when a ticket is created.
+        try {
+            const info = await pool.query(
+                `SELECT p.name AS project_name, manager.email AS manager_email,
+                        manager.name AS manager_name, t.title AS task_title
+                 FROM projects p
+                 LEFT JOIN users manager ON manager.id = p.created_by
+                 LEFT JOIN qa_tests q ON q.id = $2
+                 LEFT JOIN tasks t ON t.id = q.task_id
+                 WHERE p.id = $1`,
+                [projectId, qa_test_id || null]
+            );
+            const row = info.rows[0];
+            if (row?.manager_email) {
+                await sendEventEmail({
+                    to: row.manager_email, name: row.manager_name,
+                    subject: `New ticket created: ${title.trim()}`,
+                    intro: "A ticket has been created and may require attention.",
+                    details: [["Project", row.project_name], ["Task", row.task_title], ["Ticket", title.trim()], ["Priority", priority || "Medium"], ["Deadline", due_date || "Not set"]]
+                });
+            }
+        } catch (emailLookupError) {
+            console.error("Ticket creation notification lookup failed:", emailLookupError.message);
+        }
 
         return res.status(201).json({
             message: "Ticket created successfully",
@@ -267,6 +293,32 @@ const claimTicket = async (req, res) => {
             return res.status(400).json({
                 message: "Ticket is already claimed, completed, or does not exist"
             });
+        }
+
+        // Notify the project manager when a ticket is claimed.
+        try {
+            const info = await pool.query(
+                `SELECT tickets.title, projects.name AS project_name,
+                        manager.email AS manager_email, manager.name AS manager_name,
+                        claimant.name AS claimant_name
+                 FROM tickets
+                 LEFT JOIN projects ON projects.id = tickets.project_id
+                 LEFT JOIN users manager ON manager.id = projects.created_by
+                 LEFT JOIN users claimant ON claimant.id = $2
+                 WHERE tickets.id = $1`,
+                [ticketId, userId]
+            );
+            const row = info.rows[0];
+            if (row?.manager_email) {
+                await sendEventEmail({
+                    to: row.manager_email, name: row.manager_name,
+                    subject: `Ticket claimed: ${row.title}`,
+                    intro: `${row.claimant_name || "A team member"} claimed a ticket.`,
+                    details: [["Project", row.project_name], ["Ticket", row.title], ["Claimed by", row.claimant_name]]
+                });
+            }
+        } catch (emailLookupError) {
+            console.error("Ticket claim notification lookup failed:", emailLookupError.message);
         }
 
         return res.status(200).json({

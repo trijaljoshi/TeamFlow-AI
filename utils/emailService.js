@@ -1,53 +1,25 @@
-const { BrevoClient } = require("@getbrevo/brevo");
+const { sendEmail } = require("./emailService");
 
-const brevo = new BrevoClient({
-    apiKey: process.env.BREVO_API_KEY,
-});
+const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (ch) => ({
+  "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+}[ch]));
 
-const sendEmail = async ({
-    to,
-    name,
-    subject,
-    htmlContent,
-}) => {
-    try {
-        const result =
-            await brevo.transactionalEmails.sendTransacEmail({
-                sender: {
-                    email: process.env.BREVO_SENDER_EMAIL,
-                    name:
-                        process.env.BREVO_SENDER_NAME ||
-                        "TeamFlow AI",
-                },
+async function sendEventEmail({ to, name, subject, intro, details = [] }) {
+  if (!to) return;
+  const rows = details.map(([label, value]) =>
+    `<p><strong>${escapeHtml(label)}:</strong> ${escapeHtml(value || "—")}</p>`
+  ).join("");
+  try {
+    await sendEmail({
+      to,
+      name: name || "",
+      subject,
+      htmlContent: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;padding:24px;color:#0f172a"><h2 style="color:#0d9488">TeamFlow AI</h2><p>Hi ${escapeHtml(name || "there")},</p><p>${escapeHtml(intro)}</p>${rows}<p>Regards,<br><strong>TeamFlow AI</strong></p></div>`
+    });
+  } catch (error) {
+    // Email is best-effort; never fail the underlying task/QA/ticket action.
+    console.error("Event email failed:", subject, error?.message || error);
+  }
+}
 
-                to: [
-                    {
-                        email: to,
-                        name: name || "",
-                    },
-                ],
-
-                subject,
-
-                htmlContent,
-            });
-
-        console.log(
-            `Email sent successfully to ${to}`
-        );
-
-        return result;
-
-    } catch (error) {
-        console.error(
-            "Brevo email error:",
-            error?.message || error
-        );
-
-        throw error;
-    }
-};
-
-module.exports = {
-    sendEmail,
-};
+module.exports = { sendEventEmail };

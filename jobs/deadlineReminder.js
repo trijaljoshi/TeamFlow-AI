@@ -136,6 +136,7 @@ const checkDeadlines = async () => {
 
                 t.deadline_3d_email_sent,
                 t.deadline_1d_email_sent,
+                t.deadline_missed_email_sent,
 
                 p.name AS project_name,
                 p.created_by AS manager_id,
@@ -185,6 +186,28 @@ const checkDeadlines = async () => {
                     difference /
                     (1000 * 60 * 60 * 24)
                 );
+
+            // -----------------------------
+            // MISSED DEADLINE (send once)
+            // -----------------------------
+            if (daysLeft <= 0 && !task.deadline_missed_email_sent) {
+                const recipients = [];
+                if (task.assigned_user_email) recipients.push({ email: task.assigned_user_email, name: task.assigned_user_name });
+                if (task.manager_email && task.manager_email !== task.assigned_user_email) recipients.push({ email: task.manager_email, name: task.manager_name });
+                for (const recipient of recipients) {
+                    try {
+                        await sendEmail({
+                            to: recipient.email,
+                            name: recipient.name,
+                            subject: `Overdue task: ${task.title}`,
+                            htmlContent: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;padding:24px"><h2>TeamFlow AI</h2><p>Hi ${String(recipient.name || "there").replace(/[&<>"]/g, "")},</p><p>The task <strong>${String(task.title || "").replace(/[&<>"]/g, "")}</strong> in project <strong>${String(task.project_name || "").replace(/[&<>"]/g, "")}</strong> has passed its deadline.</p><p>Please review the task and update its status.</p></div>`
+                        });
+                    } catch (emailError) {
+                        console.error(`Failed overdue email for task ${task.id}:`, emailError.message);
+                    }
+                }
+                await pool.query("UPDATE tasks SET deadline_missed_email_sent = TRUE WHERE id = $1", [task.id]);
+            }
 
             // -----------------------------
             // 3 DAY REMINDER

@@ -1,5 +1,6 @@
 
 const pool = require("../db/db");
+const { sendEventEmail } = require("../utils/eventEmail");
 
 const normalizeStatus = (status) =>
     String(status || "PENDING").trim().toUpperCase();
@@ -274,6 +275,39 @@ const updateQATest = async (req, res) => {
              RETURNING *`,
             [status, testId]
         );
+        // Notify the project manager and task assignee of the QA result.
+        try {
+            const info = await pool.query(
+                `SELECT q.name AS qa_name, q.status AS qa_status,
+                        t.title AS task_title, p.name AS project_name,
+                        manager.email AS manager_email, manager.name AS manager_name,
+                        assignee.email AS assignee_email, assignee.name AS assignee_name
+                 FROM qa_tests q
+                 LEFT JOIN tasks t ON t.id = q.task_id
+                 LEFT JOIN projects p ON p.id = q.project_id
+                 LEFT JOIN users manager ON manager.id = p.created_by
+                 LEFT JOIN users assignee ON assignee.id = t.assigned_to
+                 WHERE q.id = $1`,
+                [testId]
+            );
+            const row = info.rows[0];
+            if (row) {
+                const recipients = new Map();
+                if (row.manager_email) recipients.set(row.manager_email, row.manager_name);
+                if (row.assignee_email) recipients.set(row.assignee_email, row.assignee_name);
+                for (const [to, name] of recipients) {
+                    await sendEventEmail({
+                        to, name,
+                        subject: `QA ${status.toLowerCase()}: ${row.task_title || row.qa_name}`,
+                        intro: `A QA test status has changed to ${status}.`,
+                        details: [["Project", row.project_name], ["Task", row.task_title], ["QA test", row.qa_name], ["Result", status]]
+                    });
+                }
+            }
+        } catch (emailLookupError) {
+            console.error("QA notification lookup failed:", emailLookupError.message);
+        }
+
         let taskQaStatus = "PENDING";
 
         if (test.task_id) {
